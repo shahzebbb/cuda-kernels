@@ -19,7 +19,6 @@ nvcc -o kernels/<example-kernel> kernels/<example-kernel>.cu
 This will perform a check with the cpu version of matmul (obtained from llmc) to validate if the kernel is working correctly. Then it will calculate the TFLOPs of the kernel.
 
 ## Todos
-- [ ] Remove block_size iteration in matmul_tiled
 - [ ] Add a softmax forward kernel
 - [ ] Add a self-attention forward kernel
 - [ ] Add a flash attention forward kernel
