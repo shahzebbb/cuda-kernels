@@ -48,8 +48,8 @@ __global__ void matmul_forward_tiled_kernel(float* out, float* A, float* B,
 void matmul_forward_tiled(float* out, float* A, float* B, 
                     int I, int J, int K, int sqrt_block_size){
     
-    dim3 gridDim(CEIL_DIV(K, TILE_WIDTH), CEIL_DIV(I, TILE_WIDTH));
-    dim3 blockDim(TILE_WIDTH, TILE_WIDTH);
+    dim3 gridDim(CEIL_DIV(K, sqrt_block_size), CEIL_DIV(I, sqrt_block_size));
+    dim3 blockDim(sqrt_block_size, sqrt_block_size);
     matmul_forward_tiled_kernel<<<gridDim, blockDim>>>(out, A, B, I, J, K);
     CHECK_CUDA_ERROR(cudaGetLastError());
     }
@@ -88,24 +88,17 @@ int main(){
     // // first check the correctness of the kernel
     matmul_forward_cpu(out, A, B, I, J, K);
 
-    int sqrt_block_sizes[] = {4, 8, 16, 32};
+    printf("Checking block size %d x %d.\n", TILE_WIDTH, TILE_WIDTH);
+    matmul_forward_tiled(d_out, d_A, d_B, I, J, K, TILE_WIDTH);
+    validate_result(d_out, out, I * K, 1e-4);
 
-    for (int j = 0; j < sizeof(sqrt_block_sizes) / sizeof(int); j++){
-        int sqrt_block_size = sqrt_block_sizes[j];
-        printf("Checking block size %d x %d.\n", sqrt_block_size, sqrt_block_size);
-        matmul_forward_tiled(d_out, d_A, d_B, I, J, K, sqrt_block_size);
-        validate_result(d_out, out, I * K, 1e-4);
-    }
-    for (int j = 0; j < sizeof(sqrt_block_sizes) / sizeof(int); j++){
-        int sqrt_block_size = sqrt_block_sizes[j];
+    int repeat_times = 100;
+    float elapsed_time = benchmark_kernel(repeat_times, matmul_forward_tiled,
+                                            d_out, d_A, d_B, I, J, K, TILE_WIDTH);
+    
+    float tflops = (float)I * (2*J - 1) * K  / elapsed_time * 1e3f / 1e12f;
+    printf("sqrt_block_size %4d | time %.4f ms | tflops %.2f \n", TILE_WIDTH, elapsed_time, tflops);
 
-        int repeat_times = 100;
-        float elapsed_time = benchmark_kernel(repeat_times, matmul_forward_tiled,
-                                              d_out, d_A, d_B, I, J, K, sqrt_block_size);
-        
-        float tflops = (float)I * (2*J - 1) * K  / elapsed_time * 1e3f / 1e12f;
-        printf("sqrt_block_size %4d | time %.4f ms | tflops %.2f \n", sqrt_block_size, elapsed_time, tflops);
-    }
 
     free(out);
     free(A);
